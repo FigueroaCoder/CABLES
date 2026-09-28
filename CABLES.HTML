@@ -73,10 +73,6 @@
             </div>
 
             <div class="flex items-center gap-2">
-                <button id="reset-btn" class="px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded-lg transition-all flex items-center gap-1.5">
-                    <i class="fa-solid fa-rotate-right text-slate-400"></i> Reiniciar Progreso
-                </button>
-                <div class="h-4 w-px bg-slate-700"></div>
                 <span id="sync-badge" class="text-xs font-mono text-slate-400 bg-slate-900/60 px-2.5 py-1 rounded-md border border-slate-800 flex items-center gap-1.5">
                     <span id="sync-dot" class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
                     <span id="sync-text">Conectando...</span>
@@ -366,7 +362,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
-        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, deleteDoc, getDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         // Firebase configuration
         const firebaseConfig = {
@@ -383,6 +379,23 @@
         const app = initializeApp(firebaseConfig);
         const analytics = getAnalytics(app);
         const db = getFirestore(app);
+
+        // Lista de cables especificados para ser marcados de inicio como recolectados
+        const preCollectedIDs = [
+            "MT2524XC28881",
+            "MT2524XC29113",
+            "MT2524XC27359",
+            "MT2524XC28234",
+            "MT2524XC28551",
+            "MT2524XC27394",
+            "MT2524XC28470",
+            "MT2524XC28526",
+            "MT2524XC28591",
+            "MT2524XC28527",
+            "MT2524XC27469",
+            "MT2524XC28518",
+            "MT2524XC28882"
+        ];
 
         const rawLogData = [
             { id: "MT2524XC20065", uses: 142, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-02-09", date: "2026-09-17 10:08:02", code: null },
@@ -471,7 +484,6 @@
         const filterTargetAllBtn = document.getElementById('filter-target-all');
         const searchInput = document.getElementById('search-input');
         const statusFilter = document.getElementById('status-filter');
-        const resetBtn = document.getElementById('reset-btn');
         const qrInput = document.getElementById('qr-input');
         const qrResultContainer = document.getElementById('qr-result-container');
         const clearQrBtn = document.getElementById('clear-qr-btn');
@@ -492,6 +504,23 @@
         const mCopyBtn = document.getElementById('m-copy-btn');
         const syncDot = document.getElementById('sync-dot');
         const syncText = document.getElementById('sync-text');
+
+        // Función para asegurar que los cables de la lista estén guardados como recolectados en Firestore
+        async function ensurePreCollectedData() {
+            for (const id of preCollectedIDs) {
+                const docRef = doc(db, "cables", id);
+                const docSnap = await getDoc(docRef);
+                if (!docSnap.exists()) {
+                    await setDoc(docRef, {
+                        collected: true,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            }
+        }
+
+        // Iniciar precarga en la base de datos
+        ensurePreCollectedData();
 
         // Escuchador en tiempo real de Firebase Firestore
         onSnapshot(collection(db, "cables"), (snapshot) => {
@@ -955,16 +984,6 @@
         statusFilter.addEventListener('change', (e) => {
             activeStatusFilter = e.target.value;
             render();
-        });
-
-        resetBtn.addEventListener('click', async () => {
-            if (confirm("¿Estás seguro de que deseas reiniciar todos los estados de recolección en la base de datos?")) {
-                for (const id of collectedSet) {
-                    await deleteDoc(doc(db, "cables", id));
-                }
-                qrResultContainer.classList.add('hidden');
-                lastScannedItem = null;
-            }
         });
 
         modalCloseBtn.addEventListener('click', closeModal);
