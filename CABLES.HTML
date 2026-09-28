@@ -15,16 +15,6 @@
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
                         mono: ['JetBrains Mono', 'monospace'],
-                    },
-                    colors: {
-                        brand: {
-                            50: '#f0f7ff',
-                            100: '#e0effe',
-                            500: '#0284c7',
-                            600: '#0284c7',
-                            700: '#0369a1',
-                            900: '#0c4a6e',
-                        }
                     }
                 }
             }
@@ -51,9 +41,59 @@
         .qr-scanner-glow {
             animation: scanGlow 3s infinite ease-in-out;
         }
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .toast-enter {
+            animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-sky-500 selection:text-white">
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-sky-500 selection:text-white relative">
+
+    <!-- MODAL DE LOGIN (OBLIGATORIO) -->
+    <div id="login-modal" class="fixed inset-0 bg-slate-950/95 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5">
+            <div class="text-center space-y-2">
+                <div class="w-14 h-14 bg-sky-500/10 border border-sky-500/20 text-sky-400 rounded-2xl flex items-center justify-center mx-auto text-2xl shadow-lg">
+                    <i class="fa-solid fa-users-gear"></i>
+                </div>
+                <h2 class="text-xl font-bold text-white">Acceso al Sistema de Recolección</h2>
+                <p class="text-xs text-slate-400">Ingresa tu nombre técnico para la competencia y la contraseña del sistema.</p>
+            </div>
+
+            <form id="login-form" class="space-y-4">
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-slate-300">Tu Nombre / Usuario:</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-user absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+                        <input type="text" id="username-input" required placeholder="Ej. Juan Pérez"
+                            class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm font-medium text-white focus:outline-none focus:border-sky-500">
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-slate-300">Contraseña:</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-key absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+                        <input type="password" id="password-input" required placeholder="Ingresa la contraseña"
+                            class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm font-medium text-white focus:outline-none focus:border-sky-500">
+                    </div>
+                    <p id="login-error" class="text-[11px] text-rose-400 font-semibold hidden mt-1">
+                        <i class="fa-solid fa-circle-exclamation"></i> Contraseña incorrecta. Intenta nuevamente.
+                    </p>
+                </div>
+
+                <button type="submit" class="w-full py-3 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-sky-600/30">
+                    Ingresar al Panel
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- CONTENEDOR DE NOTIFICACIONES FLOTANTES (TOP-RIGHT) -->
+    <div id="toast-container" class="fixed top-20 right-4 z-40 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none"></div>
 
     <header class="bg-slate-800/80 backdrop-blur border-b border-slate-700/60 sticky top-0 z-30">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap justify-between items-center gap-4">
@@ -72,7 +112,11 @@
                 </div>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-3">
+                <div class="hidden sm:flex items-center gap-2 bg-slate-900/60 border border-slate-700/60 px-3 py-1 rounded-xl">
+                    <i class="fa-solid fa-user-check text-xs text-sky-400"></i>
+                    <span id="current-user-display" class="text-xs font-semibold text-slate-200">Invitado</span>
+                </div>
                 <span id="sync-badge" class="text-xs font-mono text-slate-400 bg-slate-900/60 px-2.5 py-1 rounded-md border border-slate-800 flex items-center gap-1.5">
                     <span id="sync-dot" class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
                     <span id="sync-text">Conectando...</span>
@@ -84,7 +128,7 @@
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
         <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <!-- Metric 1: Total cables >= 129 -->
+            <!-- Metric 1 -->
             <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 flex items-center justify-between shadow-sm relative overflow-hidden">
                 <div class="space-y-1">
                     <span class="text-xs text-slate-400 font-medium">Objetivo (&ge;129 usos)</span>
@@ -96,7 +140,7 @@
                 </div>
             </div>
 
-            <!-- Metric 2: Recolectados -->
+            <!-- Metric 2 -->
             <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 flex items-center justify-between shadow-sm relative overflow-hidden">
                 <div class="space-y-1">
                     <span class="text-xs text-emerald-400 font-medium">Recolectados</span>
@@ -108,7 +152,7 @@
                 </div>
             </div>
 
-            <!-- Metric 3: Pendientes -->
+            <!-- Metric 3 -->
             <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 flex items-center justify-between shadow-sm relative overflow-hidden">
                 <div class="space-y-1">
                     <span class="text-xs text-amber-400 font-medium">Pendientes por Recoger</span>
@@ -120,7 +164,7 @@
                 </div>
             </div>
 
-            <!-- Metric 4: Avance de Recolección -->
+            <!-- Metric 4 -->
             <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
                 <div class="flex justify-between items-center">
                     <span class="text-xs text-slate-400 font-medium">Porcentaje de Avance</span>
@@ -136,6 +180,7 @@
             </div>
         </section>
 
+        <!-- ESCÁNER QR -->
         <section class="bg-gradient-to-b from-slate-800/90 to-slate-900/90 border-2 border-sky-500/50 rounded-2xl p-5 md:p-6 shadow-xl qr-scanner-glow relative overflow-hidden">
             <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                 <div class="space-y-3 flex-1">
@@ -181,6 +226,7 @@
             </div>
         </section>
 
+        <!-- FILTROS -->
         <section class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
             <div class="relative w-full md:w-96">
                 <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
@@ -209,7 +255,7 @@
 
         <div class="space-y-6">
 
-            <!-- TABLE 1: PENDIENTES POR RECOLECTAR -->
+            <!-- TABLA 1: PENDIENTES -->
             <section class="bg-slate-800/60 border border-slate-700/60 rounded-2xl overflow-hidden shadow-sm">
                 <div class="px-5 py-4 border-b border-slate-700/60 flex flex-wrap justify-between items-center gap-2 bg-slate-800/90">
                     <div class="flex items-center gap-2.5">
@@ -222,7 +268,7 @@
                             <span id="pending-count-badge" class="bg-amber-500/20 text-amber-300 text-xs font-mono px-2.5 py-0.5 rounded-full border border-amber-500/30">0</span>
                         </h2>
                     </div>
-                    <span class="text-xs text-slate-400">Haz clic en una fila para ver el detalle completo o presiona el check para marcar como recolectado.</span>
+                    <span class="text-xs text-slate-400">Haz clic en una fila para ver el detalle o presiona el check para recolectar.</span>
                 </div>
 
                 <div class="overflow-x-auto custom-scrollbar">
@@ -245,7 +291,7 @@
                 </div>
             </section>
 
-            <!-- TABLE 2: YA RECOLECTADOS -->
+            <!-- TABLA 2: YA RECOLECTADOS -->
             <section class="bg-slate-800/60 border border-slate-700/60 rounded-2xl overflow-hidden shadow-sm">
                 <div class="px-5 py-4 border-b border-slate-700/60 flex flex-wrap justify-between items-center gap-2 bg-slate-800/90">
                     <div class="flex items-center gap-2.5">
@@ -268,7 +314,7 @@
                                 <th class="p-3.5">Nivel Alerta</th>
                                 <th class="p-3.5">Estatus Previo</th>
                                 <th class="p-3.5">Ubicación Registrada</th>
-                                <th class="p-3.5">Fecha Recolección</th>
+                                <th class="p-3.5">Recolectado Por</th>
                             </tr>
                         </thead>
                         <tbody id="table-collected-body" class="divide-y divide-slate-700/40 text-slate-300 font-medium">
@@ -281,6 +327,7 @@
 
     </main>
 
+    <!-- MODAL DETALLES -->
     <div id="detail-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden transition-opacity duration-200 opacity-0">
         <div class="bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden transform scale-95 transition-all duration-200" id="modal-card">
             <div class="px-6 py-4 bg-slate-800/90 border-b border-slate-700 flex justify-between items-center">
@@ -358,13 +405,12 @@
         </div>
     </div>
 
-    <!-- SCRIPT TIPO MÓDULO CON FIREBASE INTEGRADO -->
+    <!-- FIREBASE Y LÓGICA DE LA APLICACIÓN -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
         import { getFirestore, doc, setDoc, deleteDoc, getDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBdaZVSLkDzYAx56-EpN7YTO3hOV_PnbJc",
             authDomain: "holds-8c5d5.firebaseapp.com",
@@ -375,25 +421,18 @@
             measurementId: "G-DCRKJT0J6T"
         };
 
-        // Initialize Firebase & Firestore
         const app = initializeApp(firebaseConfig);
         const analytics = getAnalytics(app);
         const db = getFirestore(app);
 
-        // Lista de cables especificados para ser marcados de inicio como recolectados
+        // Configuración de Sesión y Usuario
+        const REQUIRED_PASSWORD = "CABLESLOOP";
+        let currentUser = localStorage.getItem('cable_app_user') || null;
+
         const preCollectedIDs = [
-            "MT2524XC28881",
-            "MT2524XC29113",
-            "MT2524XC27359",
-            "MT2524XC28234",
-            "MT2524XC28551",
-            "MT2524XC27394",
-            "MT2524XC28470",
-            "MT2524XC28526",
-            "MT2524XC28591",
-            "MT2524XC28527",
-            "MT2524XC27469",
-            "MT2524XC28518",
+            "MT2524XC28881", "MT2524XC29113", "MT2524XC27359", "MT2524XC28234",
+            "MT2524XC28551", "MT2524XC27394", "MT2524XC28470", "MT2524XC28526",
+            "MT2524XC28591", "MT2524XC28527", "MT2524XC27469", "MT2524XC28518",
             "MT2524XC28882"
         ];
 
@@ -460,14 +499,23 @@
             { id: "MT2545XC21296", uses: 129, alert: "Warning: Near limit", status: "LIBRE", location: "M6L10B-11-09", date: "2026-09-26 03:10:35", code: null }
         ];
 
-        let collectedSet = new Set();
+        let collectedMap = new Map(); // Guarda ID -> { byUser, timestamp }
         let filterTarget129Only = true;
         let activeSearchQuery = '';
         let activeStatusFilter = 'ALL';
         let selectedCableId = null;
         let lastScannedItem = null;
+        let isInitialLoad = true;
 
         // Elementos DOM
+        const loginModal = document.getElementById('login-modal');
+        const loginForm = document.getElementById('login-form');
+        const usernameInput = document.getElementById('username-input');
+        const passwordInput = document.getElementById('password-input');
+        const loginError = document.getElementById('login-error');
+        const currentUserDisplay = document.getElementById('current-user-display');
+        const toastContainer = document.getElementById('toast-container');
+
         const tablePendingBody = document.getElementById('table-pending-body');
         const tableCollectedBody = document.getElementById('table-collected-body');
         const statTotalTarget = document.getElementById('stat-total-target');
@@ -505,7 +553,35 @@
         const syncDot = document.getElementById('sync-dot');
         const syncText = document.getElementById('sync-text');
 
-        // Función para asegurar que los cables de la lista estén guardados como recolectados en Firestore
+        // Manejo de Sesión
+        function checkSession() {
+            if (currentUser) {
+                loginModal.classList.add('hidden');
+                currentUserDisplay.textContent = currentUser;
+            } else {
+                loginModal.classList.remove('hidden');
+            }
+        }
+
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const pass = passwordInput.value.trim();
+            const user = usernameInput.value.trim();
+
+            if (pass !== REQUIRED_PASSWORD) {
+                loginError.classList.remove('hidden');
+                return;
+            }
+
+            loginError.classList.add('hidden');
+            currentUser = user;
+            localStorage.setItem('cable_app_user', currentUser);
+            currentUserDisplay.textContent = currentUser;
+            loginModal.classList.add('hidden');
+            qrInput.focus();
+        });
+
+        // Carga Inicial de Datos por defecto
         async function ensurePreCollectedData() {
             for (const id of preCollectedIDs) {
                 const docRef = doc(db, "cables", id);
@@ -513,25 +589,72 @@
                 if (!docSnap.exists()) {
                     await setDoc(docRef, {
                         collected: true,
+                        byUser: "Sistema",
                         timestamp: new Date().toISOString()
                     });
                 }
             }
         }
 
-        // Iniciar precarga en la base de datos
         ensurePreCollectedData();
 
-        // Escuchador en tiempo real de Firebase Firestore
+        // Notificación Flotante Estilo Competencia
+        function showNotification(user, cableId, uses) {
+            const toast = document.createElement('div');
+            toast.className = "toast-enter bg-slate-800/95 border border-emerald-500/80 rounded-xl p-3.5 shadow-2xl backdrop-blur flex items-start gap-3 border-l-4 border-l-emerald-500 text-xs";
+            toast.innerHTML = `
+                <div class="p-2 bg-emerald-500/20 text-emerald-400 rounded-lg shrink-0">
+                    <i class="fa-solid fa-trophy text-sm"></i>
+                </div>
+                <div class="space-y-0.5 flex-1">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-emerald-400 text-[11px] uppercase tracking-wider">¡Cable Encontrado!</span>
+                        <span class="text-[10px] text-slate-400 font-mono">Ahora</span>
+                    </div>
+                    <p class="text-slate-200 font-medium">
+                        <strong class="text-white font-semibold">${user}</strong> encontró el cable <span class="font-mono text-sky-300 font-bold">${cableId}</span> con <span class="font-mono text-amber-300 font-bold">${uses} usos</span>.
+                    </p>
+                </div>
+            `;
+
+            toastContainer.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                toast.style.transition = 'all 0.4s ease';
+                setTimeout(() => toast.remove(), 400);
+            }, 5000);
+        }
+
+        // Sincronización en Tiempo Real
         onSnapshot(collection(db, "cables"), (snapshot) => {
-            collectedSet.clear();
-            snapshot.forEach((doc) => {
-                if (doc.data().collected) {
-                    collectedSet.add(doc.id);
+            snapshot.docChanges().forEach((change) => {
+                const data = change.doc.data();
+                const cableId = change.doc.id;
+
+                if (change.type === "added" || change.type === "modified") {
+                    if (data.collected) {
+                        const wasAlreadyCollected = collectedMap.has(cableId);
+                        collectedMap.set(cableId, {
+                            byUser: data.byUser || 'Técnico',
+                            timestamp: data.timestamp
+                        });
+
+                        if (!isInitialLoad && !wasAlreadyCollected) {
+                            const cableObj = rawLogData.find(c => c.id === cableId);
+                            const uses = cableObj ? cableObj.uses : 0;
+                            showNotification(data.byUser || 'Un compañero', cableId, uses);
+                        }
+                    }
+                }
+                if (change.type === "removed") {
+                    collectedMap.delete(cableId);
                 }
             });
 
-            // Actualizar indicador de estado
+            isInitialLoad = false;
+
             syncDot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
             syncText.textContent = "Sincronizado Cloud";
 
@@ -544,9 +667,9 @@
                 renderQrResult(lastScannedItem);
             }
         }, (error) => {
-            console.error("Error al sincronizar con Firebase:", error);
+            console.error("Error al sincronizar:", error);
             syncDot.className = "w-2 h-2 rounded-full bg-rose-500";
-            syncText.textContent = "Error de Conexión";
+            syncText.textContent = "Error Conexión";
         });
 
         async function toggleCollection(id, e) {
@@ -554,11 +677,12 @@
             
             const cableRef = doc(db, "cables", id);
             
-            if (collectedSet.has(id)) {
+            if (collectedMap.has(id)) {
                 await deleteDoc(cableRef);
             } else {
                 await setDoc(cableRef, {
                     collected: true,
+                    byUser: currentUser || 'Técnico',
                     timestamp: new Date().toISOString()
                 });
             }
@@ -591,11 +715,11 @@
             const targetCables = rawLogData.filter(c => c.uses >= 129);
             const totalTarget = targetCables.length;
             
-            const collectedTarget = targetCables.filter(c => collectedSet.has(c.id)).length;
+            const collectedTarget = targetCables.filter(c => collectedMap.has(c.id)).length;
             const pendingTarget = totalTarget - collectedTarget;
 
-            const pendingLibre = targetCables.filter(c => !collectedSet.has(c.id) && c.status === 'LIBRE').length;
-            const pendingEnUso = targetCables.filter(c => !collectedSet.has(c.id) && c.status === 'EN USO').length;
+            const pendingLibre = targetCables.filter(c => !collectedMap.has(c.id) && c.status === 'LIBRE').length;
+            const pendingEnUso = targetCables.filter(c => !collectedMap.has(c.id) && c.status === 'EN USO').length;
 
             const percentage = totalTarget > 0 ? Math.round((collectedTarget / totalTarget) * 100) : 0;
 
@@ -650,7 +774,7 @@
         }
 
         function renderQrResult(item) {
-            const isCollected = collectedSet.has(item.id);
+            const isCollected = collectedMap.has(item.id);
             const isTarget = item.uses >= 129;
             const isCritical = item.alert === "REPLACE IMMEDIATELY";
 
@@ -718,7 +842,7 @@
 
                     <div class="flex flex-wrap justify-between items-center gap-3 pt-1">
                         <div class="text-xs text-slate-300 font-mono">
-                            ${item.code ? `<span class="text-slate-400">Código FDT:</span> <span class="text-sky-300">${item.code}</span>` : '<span class="text-slate-400">Sin código de módulo asignado</span>'}
+                            ${item.code ? `<span class="text-slate-400">Código FDT:</span> <span class="text-sky-300">${item.code}</span>` : '<span class="text-slate-400">Sin código asignado</span>'}
                         </div>
 
                         <div>
@@ -750,7 +874,6 @@
                         <p class="text-xs text-slate-300">
                             El código escaneado <code class="bg-slate-950 px-1.5 py-0.5 rounded text-amber-300 font-mono">${query}</code> no pertenece a la lista prioritaria de recolección (&ge;129 usos) o no existe en la base de datos actual.
                         </p>
-                        <p class="text-[11px] text-slate-400">No se requiere retiro inmediato de la línea de producción.</p>
                     </div>
                 </div>
             `;
@@ -768,8 +891,8 @@
 
             const filteredData = getFilteredData();
 
-            const pendingList = filteredData.filter(item => !collectedSet.has(item.id));
-            const collectedList = filteredData.filter(item => collectedSet.has(item.id));
+            const pendingList = filteredData.filter(item => !collectedMap.has(item.id));
+            const collectedList = filteredData.filter(item => collectedMap.has(item.id));
 
             pendingCountBadge.textContent = pendingList.length;
             collectedCountBadge.textContent = collectedList.length;
@@ -844,7 +967,8 @@
                 `;
             } else {
                 tableCollectedBody.innerHTML = collectedList.map(item => {
-                    const isCritical = item.alert === "REPLACE IMMEDIATELY";
+                    const collectData = collectedMap.get(item.id) || {};
+                    const byUser = collectData.byUser || 'Técnico';
 
                     return `
                         <tr data-id="${item.id}" class="clickable-row hover:bg-slate-700/40 transition-colors cursor-pointer group opacity-85">
@@ -863,19 +987,18 @@
                                 </span>
                             </td>
                             <td class="p-3.5 text-slate-400">
-                                ${isCritical ? 'Reemplazo Inmediato' : 'Cerca de límite'}
+                                ${item.alert === "REPLACE IMMEDIATELY" ? 'Reemplazo Inmediato' : 'Cerca de límite'}
                             </td>
                             <td class="p-3.5 text-slate-400 font-mono">${item.status}</td>
                             <td class="p-3.5 font-mono text-slate-400">${item.location}</td>
-                            <td class="p-3.5 font-mono text-emerald-400 text-[11px]">
-                                <i class="fa-solid fa-check-double mr-1"></i> Recolectado
+                            <td class="p-3.5 text-emerald-400 font-semibold text-xs">
+                                <i class="fa-solid fa-user-check mr-1"></i> ${byUser}
                             </td>
                         </tr>
                     `;
                 }).join('');
             }
 
-            // Asignación de Eventos a Filas y Botones dinámicos
             document.querySelectorAll('.clickable-row').forEach(row => {
                 row.addEventListener('click', (e) => {
                     if (e.target.closest('.action-td')) return;
@@ -896,7 +1019,7 @@
             if (!item) return;
 
             selectedCableId = id;
-            const isCollected = collectedSet.has(id);
+            const isCollected = collectedMap.has(id);
             const isCritical = item.alert === "REPLACE IMMEDIATELY";
 
             mCableId.textContent = item.id;
@@ -919,11 +1042,11 @@
             mOperationalStatus.textContent = item.status;
             mOperationalStatus.className = item.status === 'EN USO' ? 'font-bold text-purple-400' : 'font-bold text-emerald-400';
 
-            mFdtCode.textContent = item.code ? item.code : 'Sin código de módulo asignado';
+            mFdtCode.textContent = item.code ? item.code : 'Sin código asignado';
             mLocation.textContent = item.location;
             mDate.textContent = item.date;
 
-            mCollectedStatus.textContent = isCollected ? 'Recolectado' : 'Pendiente por recolectar';
+            mCollectedStatus.textContent = isCollected ? `Recolectado por ${collectedMap.get(id)?.byUser || 'Técnico'}` : 'Pendiente por recolectar';
             mCollectedStatus.className = isCollected ? 'font-bold text-emerald-400' : 'font-bold text-amber-400';
 
             if (isCollected) {
@@ -950,7 +1073,7 @@
             }, 200);
         }
 
-        // Event Listeners
+        // Event Listeners generales
         document.getElementById('qr-scan-form').addEventListener('submit', handleQrScan);
         clearQrBtn.addEventListener('click', clearQrInput);
 
@@ -1013,7 +1136,7 @@
         });
 
         window.onload = function() {
-            qrInput.focus();
+            checkSession();
         };
     </script>
 </body>
