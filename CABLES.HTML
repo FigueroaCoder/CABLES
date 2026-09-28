@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control y Recolección de Cables - MT2524XC</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#0284c7',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 3px;
+        }
+        @keyframes scanGlow {
+            0%, 100% { border-color: rgba(14, 165, 233, 0.4); box-shadow: 0 0 15px rgba(14, 165, 233, 0.1); }
+            50% { border-color: rgba(56, 189, 248, 0.9); box-shadow: 0 0 25px rgba(56, 189, 248, 0.35); }
+        }
+        .qr-scanner-glow {
+            animation: scanGlow 3s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-sky-500 selection:text-white">
+
+    <header class="bg-slate-800/80 backdrop-blur border-b border-slate-700/60 sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="p-2.5 bg-gradient-to-tr from-sky-600 to-indigo-600 rounded-xl shadow-lg shadow-sky-500/20 text-white">
+                    <i class="fa-solid fa-plug-circle-exclamation text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                        Control de Recolección de Cables
+                        <span class="text-xs font-mono font-normal bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-full">
+                            Target &ge; 129 Usos
+                        </span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Sistema de trazabilidad, verificación QR y retiro inmediato</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button id="reset-btn" class="px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded-lg transition-all flex items-center gap-1.5">
+                    <i class="fa-solid fa-rotate-right text-slate-400"></i> Reiniciar Progreso
+                </button>
+                <div class="h-4 w-px bg-slate-700"></div>
+                <span id="sync-badge" class="text-xs font-mono text-slate-400 bg-slate-900/60 px-2.5 py-1 rounded-md border border-slate-800 flex items-center gap-1.5">
+                    <span id="sync-dot" class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                    <span id="sync-text">Conectando...</span>
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Metric 1: Total cables >= 129 -->
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 flex items-center justify-between shadow-sm relative overflow-hidden">
+                <div class="space-y-1">
+                    <span class="text-xs text-slate-400 font-medium">Objetivo (&ge;129 usos)</span>
+                    <div id="stat-total-target" class="text-3xl font-extrabold text-white font-mono">0</div>
+                    <span class="text-[11px] text-slate-400">Total a recolectar</span>
+                </div>
+                <div class="w-12 h-12 bg-sky-500/10 border border-sky-500/20 rounded-xl flex items-center justify-center text-sky-400 text-xl">
+                    <i class="fa-solid fa-bullseye"></i>
+                </div>
+            </div>
+
+            <!-- Metric 2: Recolectados -->
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 flex items-center justify-between shadow-sm relative overflow-hidden">
+                <div class="space-y-1">
+                    <span class="text-xs text-emerald-400 font-medium">Recolectados</span>
+                    <div id="stat-collected" class="text-3xl font-extrabold text-emerald-400 font-mono">0</div>
+                    <span id="stat-collected-sub" class="text-[11px] text-slate-400">0% completado</span>
+                </div>
+                <div class="w-12 h-12 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-400 text-xl">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
+            </div>
+
+            <!-- Metric 3: Pendientes -->
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 flex items-center justify-between shadow-sm relative overflow-hidden">
+                <div class="space-y-1">
+                    <span class="text-xs text-amber-400 font-medium">Pendientes por Recoger</span>
+                    <div id="stat-pending" class="text-3xl font-extrabold text-amber-400 font-mono">0</div>
+                    <span id="stat-pending-sub" class="text-[11px] text-slate-400">0 Libres / 0 En Uso</span>
+                </div>
+                <div class="w-12 h-12 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-center text-amber-400 text-xl">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+            </div>
+
+            <!-- Metric 4: Avance de Recolección -->
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
+                <div class="flex justify-between items-center">
+                    <span class="text-xs text-slate-400 font-medium">Porcentaje de Avance</span>
+                    <span id="stat-percentage" class="text-lg font-bold text-sky-400 font-mono">0%</span>
+                </div>
+                <div class="w-full bg-slate-700/60 h-3 rounded-full overflow-hidden my-2 border border-slate-600/40">
+                    <div id="progress-bar" class="bg-gradient-to-r from-sky-500 to-emerald-400 h-full transition-all duration-500 rounded-full" style="width: 0%"></div>
+                </div>
+                <div class="flex justify-between text-[11px] text-slate-400 font-mono">
+                    <span>Meta: 100%</span>
+                    <span id="stat-status-text">Iniciando...</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="bg-gradient-to-b from-slate-800/90 to-slate-900/90 border-2 border-sky-500/50 rounded-2xl p-5 md:p-6 shadow-xl qr-scanner-glow relative overflow-hidden">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                <div class="space-y-3 flex-1">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-sky-500/20 border border-sky-400/40 text-sky-400">
+                                <i class="fa-solid fa-qrcode text-lg"></i>
+                            </span>
+                            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                                Terminal Escáner QR / Lector de Código
+                            </h2>
+                        </div>
+                        <label class="inline-flex items-center gap-2 text-xs text-slate-300 bg-slate-900/80 px-3 py-1 rounded-full border border-slate-700 cursor-pointer">
+                            <input type="checkbox" id="auto-clear-check" checked class="rounded bg-slate-800 border-slate-700 text-sky-500 focus:ring-sky-500">
+                            <span>Modo Lectura Continua</span>
+                        </label>
+                    </div>
+
+                    <p class="text-xs text-slate-400">
+                        Escanea con el lector láser/físico o escribe el Serial (ej. <code class="bg-slate-900 px-1.5 py-0.5 rounded text-sky-300 font-mono">MT2524XC20065</code>) o Código FDT para verificar si requiere recolección inmediata.
+                    </p>
+
+                    <form id="qr-scan-form" class="flex flex-col sm:flex-row gap-2.5 pt-1">
+                        <div class="relative flex-1">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-sky-400">
+                                <i class="fa-solid fa-barcode text-base"></i>
+                            </div>
+                            <input type="text" id="qr-input" autocomplete="off" placeholder="Escribe o escanea el QR del cable..."
+                                class="w-full bg-slate-950/90 border border-sky-500/40 rounded-xl pl-10 pr-10 py-3 text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/50 shadow-inner">
+                            <button type="button" id="clear-qr-btn" title="Limpiar campo" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-300 hidden">
+                                <i class="fa-solid fa-circle-xmark"></i>
+                            </button>
+                        </div>
+
+                        <button type="submit" class="px-6 py-3 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md shadow-sky-600/30 flex items-center justify-center gap-2 shrink-0">
+                            <i class="fa-solid fa-magnifying-glass font-bold"></i> Verificar QR
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div id="qr-result-container" class="mt-4 hidden border-t border-slate-700/80 pt-4">
+            </div>
+        </section>
+
+        <section class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div class="relative w-full md:w-96">
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                <input type="text" id="search-input" placeholder="Filtrar por ID, Código, Ubicación..." 
+                    class="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all">
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+                <div class="flex items-center bg-slate-900/80 p-1 rounded-xl border border-slate-700 text-xs">
+                    <button id="filter-target-129" class="px-3 py-1.5 rounded-lg font-medium transition-all bg-sky-600 text-white shadow-sm">
+                        &ge; 129 Usos (Objetivo)
+                    </button>
+                    <button id="filter-target-all" class="px-3 py-1.5 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition-all">
+                        Todos (&lt;129)
+                    </button>
+                </div>
+
+                <select id="status-filter" class="bg-slate-900/90 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-sky-500">
+                    <option value="ALL">Todos los Estados</option>
+                    <option value="LIBRE">Solo LIBRE</option>
+                    <option value="EN USO">Solo EN USO</option>
+                    <option value="REPLACE IMMEDIATELY">Reemplazo Inmediato (&ge;130)</option>
+                </select>
+            </div>
+        </section>
+
+        <div class="space-y-6">
+
+            <!-- TABLE 1: PENDIENTES POR RECOLECTAR -->
+            <section class="bg-slate-800/60 border border-slate-700/60 rounded-2xl overflow-hidden shadow-sm">
+                <div class="px-5 py-4 border-b border-slate-700/60 flex flex-wrap justify-between items-center gap-2 bg-slate-800/90">
+                    <div class="flex items-center gap-2.5">
+                        <span class="flex h-3 w-3 relative">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                        </span>
+                        <h2 class="text-base font-bold text-white flex items-center gap-2">
+                            Cables Pendientes por Recolectar
+                            <span id="pending-count-badge" class="bg-amber-500/20 text-amber-300 text-xs font-mono px-2.5 py-0.5 rounded-full border border-amber-500/30">0</span>
+                        </h2>
+                    </div>
+                    <span class="text-xs text-slate-400">Haz clic en una fila para ver el detalle completo o presiona el check para marcar como recolectado.</span>
+                </div>
+
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-slate-900/60 text-slate-400 font-semibold border-b border-slate-700/60 uppercase tracking-wider">
+                                <th class="p-3.5 text-center w-12">Acción</th>
+                                <th class="p-3.5">ID Cable Serial</th>
+                                <th class="p-3.5 text-center">Usos</th>
+                                <th class="p-3.5">Nivel Alerta</th>
+                                <th class="p-3.5">Estatus Operativo</th>
+                                <th class="p-3.5">Código / FDT</th>
+                                <th class="p-3.5">Ubicación</th>
+                                <th class="p-3.5">Último Registro</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-pending-body" class="divide-y divide-slate-700/40 text-slate-300 font-medium">
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- TABLE 2: YA RECOLECTADOS -->
+            <section class="bg-slate-800/60 border border-slate-700/60 rounded-2xl overflow-hidden shadow-sm">
+                <div class="px-5 py-4 border-b border-slate-700/60 flex flex-wrap justify-between items-center gap-2 bg-slate-800/90">
+                    <div class="flex items-center gap-2.5">
+                        <span class="inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                        <h2 class="text-base font-bold text-white flex items-center gap-2">
+                            Cables Ya Recolectados
+                            <span id="collected-count-badge" class="bg-emerald-500/20 text-emerald-300 text-xs font-mono px-2.5 py-0.5 rounded-full border border-emerald-500/30">0</span>
+                        </h2>
+                    </div>
+                    <span class="text-xs text-slate-400">Cables verificados y fuera de la línea de operación.</span>
+                </div>
+
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-slate-900/60 text-slate-400 font-semibold border-b border-slate-700/60 uppercase tracking-wider">
+                                <th class="p-3.5 text-center w-12">Deshacer</th>
+                                <th class="p-3.5">ID Cable Serial</th>
+                                <th class="p-3.5 text-center">Usos</th>
+                                <th class="p-3.5">Nivel Alerta</th>
+                                <th class="p-3.5">Estatus Previo</th>
+                                <th class="p-3.5">Ubicación Registrada</th>
+                                <th class="p-3.5">Fecha Recolección</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-collected-body" class="divide-y divide-slate-700/40 text-slate-300 font-medium">
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+        </div>
+
+    </main>
+
+    <div id="detail-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden transition-opacity duration-200 opacity-0">
+        <div class="bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden transform scale-95 transition-all duration-200" id="modal-card">
+            <div class="px-6 py-4 bg-slate-800/90 border-b border-slate-700 flex justify-between items-center">
+                <div class="flex items-center gap-2.5">
+                    <div class="p-2 bg-sky-500/10 border border-sky-500/20 text-sky-400 rounded-lg">
+                        <i class="fa-solid fa-microchip text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-white font-mono" id="m-cable-id">MT2524XC20065</h3>
+                        <p class="text-xs text-slate-400">Detalles de Trazabilidad e Historial</p>
+                    </div>
+                </div>
+                <button id="modal-close-btn" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-4 text-xs">
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50 space-y-1">
+                        <span class="text-slate-400 block text-[11px]">Número de Usos</span>
+                        <div class="text-xl font-bold font-mono text-white flex items-center gap-2" id="m-uses">
+                            142
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50 space-y-1">
+                        <span class="text-slate-400 block text-[11px]">Categoría / Alerta</span>
+                        <div id="m-alert-badge" class="font-bold"></div>
+                    </div>
+                </div>
+
+                <div class="space-y-3 bg-slate-800/30 p-4 rounded-xl border border-slate-800">
+                    <div class="flex justify-between items-center py-1 border-b border-slate-800">
+                        <span class="text-slate-400">Estatus de Disponibilidad:</span>
+                        <span id="m-operational-status" class="font-bold">LIBRE</span>
+                    </div>
+
+                    <div class="flex justify-between items-center py-1 border-b border-slate-800">
+                        <span class="text-slate-400">Código de FDT / Uso:</span>
+                        <span id="m-fdt-code" class="font-mono font-medium text-slate-200">N/A</span>
+                    </div>
+
+                    <div class="flex justify-between items-center py-1 border-b border-slate-800">
+                        <span class="text-slate-400">Última Ubicación Registrada:</span>
+                        <span id="m-location" class="font-mono font-semibold text-sky-400">M7L10A-02-09</span>
+                    </div>
+
+                    <div class="flex justify-between items-center py-1 border-b border-slate-800">
+                        <span class="text-slate-400">Último Timestamp:</span>
+                        <span id="m-date" class="font-mono text-slate-300">2026-09-17 10:08:02</span>
+                    </div>
+
+                    <div class="flex justify-between items-center py-1">
+                        <span class="text-slate-400">Estado de Recolección:</span>
+                        <span id="m-collected-status" class="font-semibold text-amber-400">Pendiente</span>
+                    </div>
+                </div>
+
+                <div class="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-2.5 text-amber-300 text-[11px]">
+                    <i class="fa-solid fa-circle-info text-sm mt-0.5 shrink-0"></i>
+                    <p id="m-action-advice">Este cable supera el límite seguro de uso. Debe ser retirado de operación y enviado a revisión de calidad.</p>
+                </div>
+            </div>
+
+            <div class="px-6 py-4 bg-slate-800/90 border-t border-slate-700 flex justify-between items-center">
+                <button id="m-copy-btn" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-medium transition-colors flex items-center gap-1.5">
+                    <i class="fa-solid fa-copy"></i> Copiar Datos
+                </button>
+
+                <button id="m-toggle-collect-btn" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-emerald-600/20">
+                    <i class="fa-solid fa-check"></i> Marcar como Recolectado
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT TIPO MÓDULO CON FIREBASE INTEGRADO -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
+        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBdaZVSLkDzYAx56-EpN7YTO3hOV_PnbJc",
+            authDomain: "holds-8c5d5.firebaseapp.com",
+            projectId: "holds-8c5d5",
+            storageBucket: "holds-8c5d5.firebasestorage.app",
+            messagingSenderId: "313031756800",
+            appId: "1:313031756800:web:38ef9e962060cf66ed1ce5",
+            measurementId: "G-DCRKJT0J6T"
+        };
+
+        // Initialize Firebase & Firestore
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const db = getFirestore(app);
+
+        const rawLogData = [
+            { id: "MT2524XC20065", uses: 142, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-02-09", date: "2026-09-17 10:08:02", code: null },
+            { id: "MT2524XC28725", uses: 142, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-15-04", date: "2026-09-11 23:17:46", code: null },
+            { id: "MT2524XC28881", uses: 137, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-12-08", date: "2026-09-15 23:23:58", code: null },
+            { id: "MT2524XC29113", uses: 136, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-12-07", date: "2026-09-10 04:21:39", code: null },
+            { id: "MT2524XC27359", uses: 134, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-11-02", date: "2026-09-17 09:01:30", code: null },
+            { id: "MT2524XC28234", uses: 134, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-03-06", date: "2026-09-09 18:05:23", code: null },
+            { id: "MT2524XC28551", uses: 133, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-15-12", date: "2026-09-17 12:59:22", code: null },
+            { id: "MT2524XC27394", uses: 132, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-14-01", date: "2026-09-09 07:38:15", code: null },
+            { id: "MT2524XC28470", uses: 132, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-07-11", date: "2026-09-17 09:05:44", code: null },
+            { id: "MT2524XC28526", uses: 132, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-07-11", date: "2026-09-17 09:05:44", code: null },
+            { id: "MT2524XC28591", uses: 132, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-09-10", date: "2026-09-17 08:00:32", code: null },
+            { id: "MT2524XC28471", uses: 131, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-18-03", date: "2026-09-12 13:01:37", code: null },
+            { id: "MT2524XC28527", uses: 131, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-12-06", date: "2026-09-09 21:01:08", code: null },
+            { id: "MT2524XC27469", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-03-06", date: "2026-09-13 00:30:52", code: null },
+            { id: "MT2524XC28518", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-08-12", date: "2026-09-09 22:58:31", code: null },
+            { id: "MT2524XC28882", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-04-02", date: "2026-09-17 13:10:35", code: null },
+            { id: "MT2524XC21738", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-03-03", date: "2026-09-22 08:40:17", code: null },
+            { id: "MT2524XC21747", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-16-05", date: "2026-09-24 21:48:44", code: null },
+            { id: "MT2524XC21761", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-16-05", date: "2026-09-24 20:38:48", code: null },
+            { id: "MT2524XC27195", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-07-05", date: "2026-09-23 23:45:28", code: null },
+            { id: "MT2524XC27235", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-10-08", date: "2026-09-24 09:16:40", code: null },
+            { id: "MT2524XC27279", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-14-05", date: "2026-09-26 08:35:06", code: null },
+            { id: "MT2524XC27419", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-02-08", date: "2026-09-19 09:15:37", code: null },
+            { id: "MT2524XC27443", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-15-08", date: "2026-09-19 21:50:13", code: null },
+            { id: "MT2524XC27451", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-17-01", date: "2026-09-23 21:08:38", code: null },
+            { id: "MT2524XC27465", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-14-09", date: "2026-09-24 15:37:31", code: null },
+            { id: "MT2524XC27507", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-15-12", date: "2026-09-25 15:42:01", code: null },
+            { id: "MT2524XC27640", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-04-07", date: "2026-09-23 08:37:57", code: null },
+            { id: "MT2524XC27892", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-11-03", date: "2026-09-23 09:20:48", code: null },
+            { id: "MT2524XC28425", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-12-09", date: "2026-09-20 00:41:52", code: null },
+            { id: "MT2524XC28498", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-08-09", date: "2026-09-21 20:26:40", code: null },
+            { id: "MT2524XC28565", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-12-08", date: "2026-09-25 21:39:55", code: null },
+            { id: "MT2524XC28606", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-13-09", date: "2026-09-23 17:09:17", code: null },
+            { id: "MT2524XC28641", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-08-04", date: "2026-09-25 13:25:28", code: null },
+            { id: "MT2524XC28678", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-10-08", date: "2026-09-26 17:33:39", code: null },
+            { id: "MT2524XC28701", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-07-05", date: "2026-09-23 23:45:28", code: null },
+            { id: "MT2524XC28804", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-13-06", date: "2026-09-20 04:24:56", code: null },
+            { id: "MT2524XC28847", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-07-04", date: "2026-09-19 23:34:19", code: null },
+            { id: "MT2524XC28863", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-03-08", date: "2026-09-23 16:59:52", code: null },
+            { id: "MT2524XC28869", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-14-05", date: "2026-09-26 12:25:12", code: null },
+            { id: "MT2524XC28894", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-11-07", date: "2026-09-26 08:22:16", code: null },
+            { id: "MT2524XC28951", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-08-05", date: "2026-09-23 17:18:52", code: null },
+            { id: "MT2524XC29014", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-07-10", date: "2026-09-19 23:37:13", code: null },
+            { id: "MT2524XC29038", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-18-13", date: "2026-09-26 08:37:27", code: null },
+            { id: "MT2524XC29042", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-10-12", date: "2026-09-22 17:32:35", code: null },
+            { id: "MT2524XC29086", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-11-09", date: "2026-09-26 08:30:55", code: null },
+            { id: "MT2524XC29104", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-08-04", date: "2026-09-26 16:31:16", code: null },
+            { id: "MT2524XC29105", uses: 130, alert: "Warning: Near limit", status: "EN USO", location: "M6L10B-06-12 · FDT", date: "2026-09-27 03:21:52", code: "1CLE63800496" },
+            { id: "MT2524XC29118", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-13-06", date: "2026-09-24 09:23:19", code: null },
+            { id: "MT2524XC29124", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-08-09", date: "2026-09-25 21:02:20", code: null },
+            { id: "MT2524XC20054", uses: 129, alert: "Warning: Near limit", status: "LIBRE", location: "M7L10A-12-07", date: "2026-09-25 21:39:05", code: null },
+            { id: "MT2524XC21759", uses: 129, alert: "Warning: Near limit", status: "LIBRE", location: "M6L10A-15-05", date: "2026-09-17 20:26:38", code: null },
+            { id: "MT2524XC27412", uses: 129, alert: "Warning: Near limit", status: "LIBRE", location: "M6L10A-08-03", date: "2026-09-26 21:06:28", code: null },
+            { id: "MT2524XC27833", uses: 129, alert: "Warning: Near limit", status: "EN USO", location: "M6L10B-07-08 · FDT", date: "2026-09-27 00:58:36", code: "1CLE63800488" },
+            { id: "MT2524XC28117", uses: 129, alert: "Warning: Near limit", status: "LIBRE", location: "M6L10A-16-09", date: "2026-09-11 19:54:19", code: null },
+            { id: "MT2524XC28309", uses: 129, alert: "Warning: Near limit", status: "EN USO", location: "M6L10A-16-05 · FDT", date: "2026-09-27 01:02:30", code: "1CLE63900094" },
+            { id: "MT2524XC28721", uses: 129, alert: "Warning: Near limit", status: "EN USO", location: "M6L10A-09-02 · FDT", date: "2026-09-28 08:49:54", code: "1CLE63800472" },
+            { id: "MT2524XC29092", uses: 129, alert: "Warning: Near limit", status: "EN USO", location: "M6L10B-04-13 · FDT", date: "2026-09-26 08:47:18", code: "1CLE63800312" },
+            { id: "MT2524XC29120", uses: 129, alert: "Warning: Near limit", status: "EN USO", location: "M6L10B-04-03 · FDT", date: "2026-09-26 12:39:47", code: "1CLE63800141" },
+            { id: "MT2545XC21296", uses: 129, alert: "Warning: Near limit", status: "LIBRE", location: "M6L10B-11-09", date: "2026-09-26 03:10:35", code: null }
+        ];
+
+        let collectedSet = new Set();
+        let filterTarget129Only = true;
+        let activeSearchQuery = '';
+        let activeStatusFilter = 'ALL';
+        let selectedCableId = null;
+        let lastScannedItem = null;
+
+        // Elementos DOM
+        const tablePendingBody = document.getElementById('table-pending-body');
+        const tableCollectedBody = document.getElementById('table-collected-body');
+        const statTotalTarget = document.getElementById('stat-total-target');
+        const statCollected = document.getElementById('stat-collected');
+        const statCollectedSub = document.getElementById('stat-collected-sub');
+        const statPending = document.getElementById('stat-pending');
+        const statPendingSub = document.getElementById('stat-pending-sub');
+        const statPercentage = document.getElementById('stat-percentage');
+        const statStatusText = document.getElementById('stat-status-text');
+        const progressBar = document.getElementById('progress-bar');
+        const pendingCountBadge = document.getElementById('pending-count-badge');
+        const collectedCountBadge = document.getElementById('collected-count-badge');
+        const filterTarget129Btn = document.getElementById('filter-target-129');
+        const filterTargetAllBtn = document.getElementById('filter-target-all');
+        const searchInput = document.getElementById('search-input');
+        const statusFilter = document.getElementById('status-filter');
+        const resetBtn = document.getElementById('reset-btn');
+        const qrInput = document.getElementById('qr-input');
+        const qrResultContainer = document.getElementById('qr-result-container');
+        const clearQrBtn = document.getElementById('clear-qr-btn');
+        const autoClearCheck = document.getElementById('auto-clear-check');
+        const detailModal = document.getElementById('detail-modal');
+        const modalCard = document.getElementById('modal-card');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
+        const mCableId = document.getElementById('m-cable-id');
+        const mUses = document.getElementById('m-uses');
+        const mAlertBadge = document.getElementById('m-alert-badge');
+        const mOperationalStatus = document.getElementById('m-operational-status');
+        const mFdtCode = document.getElementById('m-fdt-code');
+        const mLocation = document.getElementById('m-location');
+        const mDate = document.getElementById('m-date');
+        const mCollectedStatus = document.getElementById('m-collected-status');
+        const mActionAdvice = document.getElementById('m-action-advice');
+        const mToggleCollectBtn = document.getElementById('m-toggle-collect-btn');
+        const mCopyBtn = document.getElementById('m-copy-btn');
+        const syncDot = document.getElementById('sync-dot');
+        const syncText = document.getElementById('sync-text');
+
+        // Escuchador en tiempo real de Firebase Firestore
+        onSnapshot(collection(db, "cables"), (snapshot) => {
+            collectedSet.clear();
+            snapshot.forEach((doc) => {
+                if (doc.data().collected) {
+                    collectedSet.add(doc.id);
+                }
+            });
+
+            // Actualizar indicador de estado
+            syncDot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+            syncText.textContent = "Sincronizado Cloud";
+
+            render();
+
+            if (selectedCableId && !detailModal.classList.contains('hidden')) {
+                openModal(selectedCableId);
+            }
+            if (lastScannedItem) {
+                renderQrResult(lastScannedItem);
+            }
+        }, (error) => {
+            console.error("Error al sincronizar con Firebase:", error);
+            syncDot.className = "w-2 h-2 rounded-full bg-rose-500";
+            syncText.textContent = "Error de Conexión";
+        });
+
+        async function toggleCollection(id, e) {
+            if(e) e.stopPropagation();
+            
+            const cableRef = doc(db, "cables", id);
+            
+            if (collectedSet.has(id)) {
+                await deleteDoc(cableRef);
+            } else {
+                await setDoc(cableRef, {
+                    collected: true,
+                    timestamp: new Date().toISOString()
+                });
+            }
+        }
+
+        function getFilteredData() {
+            return rawLogData.filter(item => {
+                if (filterTarget129Only && item.uses < 129) return false;
+
+                if (activeSearchQuery.trim() !== '') {
+                    const q = activeSearchQuery.toLowerCase();
+                    const matchId = item.id.toLowerCase().includes(q);
+                    const matchLoc = item.location.toLowerCase().includes(q);
+                    const matchCode = item.code ? item.code.toLowerCase().includes(q) : false;
+                    const matchAlert = item.alert.toLowerCase().includes(q);
+                    if (!matchId && !matchLoc && !matchCode && !matchAlert) return false;
+                }
+
+                if (activeStatusFilter !== 'ALL') {
+                    if (activeStatusFilter === 'LIBRE' && item.status !== 'LIBRE') return false;
+                    if (activeStatusFilter === 'EN USO' && item.status !== 'EN USO') return false;
+                    if (activeStatusFilter === 'REPLACE IMMEDIATELY' && item.alert !== 'REPLACE IMMEDIATELY') return false;
+                }
+
+                return true;
+            });
+        }
+
+        function updateMetrics() {
+            const targetCables = rawLogData.filter(c => c.uses >= 129);
+            const totalTarget = targetCables.length;
+            
+            const collectedTarget = targetCables.filter(c => collectedSet.has(c.id)).length;
+            const pendingTarget = totalTarget - collectedTarget;
+
+            const pendingLibre = targetCables.filter(c => !collectedSet.has(c.id) && c.status === 'LIBRE').length;
+            const pendingEnUso = targetCables.filter(c => !collectedSet.has(c.id) && c.status === 'EN USO').length;
+
+            const percentage = totalTarget > 0 ? Math.round((collectedTarget / totalTarget) * 100) : 0;
+
+            statTotalTarget.textContent = totalTarget;
+            statCollected.textContent = collectedTarget;
+            statCollectedSub.textContent = `${percentage}% completado`;
+            
+            statPending.textContent = pendingTarget;
+            statPendingSub.textContent = `${pendingLibre} Libres / ${pendingEnUso} En Uso`;
+
+            statPercentage.textContent = `${percentage}%`;
+            progressBar.style.width = `${percentage}%`;
+
+            if (percentage === 100) {
+                statStatusText.textContent = "¡Completado!";
+                statStatusText.className = "text-emerald-400 font-bold font-mono";
+            } else if (percentage > 50) {
+                statStatusText.textContent = "En buen progreso";
+                statStatusText.className = "text-sky-400 font-mono";
+            } else {
+                statStatusText.textContent = "Pendiente de recolección";
+                statStatusText.className = "text-amber-400 font-mono";
+            }
+        }
+
+        function handleQrScan(event) {
+            if (event) event.preventDefault();
+            const query = qrInput.value.trim().toUpperCase();
+            if (!query) return;
+
+            const matchedItem = rawLogData.find(item => {
+                const idMatch = item.id.toUpperCase() === query || query.includes(item.id.toUpperCase()) || item.id.toUpperCase().includes(query);
+                const codeMatch = item.code && item.code.toUpperCase() === query;
+                return idMatch || codeMatch;
+            });
+
+            if (matchedItem) {
+                lastScannedItem = matchedItem;
+                renderQrResult(matchedItem);
+            } else {
+                lastScannedItem = null;
+                renderQrNotFound(query);
+            }
+
+            if (autoClearCheck.checked) {
+                setTimeout(() => {
+                    qrInput.value = '';
+                    clearQrBtn.classList.add('hidden');
+                    qrInput.focus();
+                }, 300);
+            }
+        }
+
+        function renderQrResult(item) {
+            const isCollected = collectedSet.has(item.id);
+            const isTarget = item.uses >= 129;
+            const isCritical = item.alert === "REPLACE IMMEDIATELY";
+
+            qrResultContainer.classList.remove('hidden');
+
+            let headerBg, borderColor, icon, alertTitle, badgeClass;
+
+            if (isCollected) {
+                headerBg = "bg-emerald-950/60";
+                borderColor = "border-emerald-500/60";
+                icon = '<i class="fa-solid fa-circle-check text-emerald-400 text-2xl"></i>';
+                alertTitle = "CABLE CUMPLE RECOLECCIÓN (YA PROCESADO)";
+                badgeClass = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
+            } else if (isTarget) {
+                headerBg = isCritical ? "bg-rose-950/60" : "bg-amber-950/60";
+                borderColor = isCritical ? "border-rose-500/60" : "border-amber-500/60";
+                icon = '<i class="fa-solid fa-triangle-exclamation text-amber-400 text-2xl"></i>';
+                alertTitle = isCritical ? "¡ALERTA CRÍTICA! REEMPLAZO INMEDIATO Y RECOLECCIÓN REQUERIDA" : "CABLE LOCALIZADO: RECOLECCIÓN REQUERIDA (&ge;129 USOS)";
+                badgeClass = isCritical ? "bg-rose-500/20 text-rose-300 border-rose-500/30" : "bg-amber-500/20 text-amber-300 border-amber-500/30";
+            } else {
+                headerBg = "bg-slate-800/80";
+                borderColor = "border-slate-600";
+                icon = '<i class="fa-solid fa-info-circle text-sky-400 text-2xl"></i>';
+                alertTitle = "CABLE EN REGISTRO (BAJO LÍMITE DE RECOLECCIÓN <129 USOS)";
+                badgeClass = "bg-sky-500/20 text-sky-300 border-sky-500/30";
+            }
+
+            qrResultContainer.innerHTML = `
+                <div class="${headerBg} border ${borderColor} rounded-xl p-4 transition-all duration-300 shadow-xl space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-700/60 pb-3">
+                        <div class="flex items-center gap-3">
+                            ${icon}
+                            <div>
+                                <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Resultado del Escáner QR</span>
+                                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                                    ${alertTitle}
+                                </h3>
+                            </div>
+                        </div>
+                        <button id="qr-view-full" class="text-xs text-sky-400 hover:text-sky-300 font-medium underline flex items-center gap-1">
+                            Ver Ficha Completa <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                        <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                            <span class="text-slate-400 block text-[10px]">ID Serial Cable</span>
+                            <span class="font-mono font-bold text-white text-sm">${item.id}</span>
+                        </div>
+                        <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                            <span class="text-slate-400 block text-[10px]">Total de Usos</span>
+                            <span class="font-mono font-bold text-white text-sm">
+                                <span class="px-2 py-0.5 rounded ${badgeClass}">${item.uses} usos</span>
+                            </span>
+                        </div>
+                        <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                            <span class="text-slate-400 block text-[10px]">Ubicación Actual</span>
+                            <span class="font-mono font-semibold text-sky-300 text-xs">${item.location}</span>
+                        </div>
+                        <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                            <span class="text-slate-400 block text-[10px]">Estatus Operativo</span>
+                            <span class="font-bold text-xs ${item.status === 'EN USO' ? 'text-purple-300' : 'text-emerald-300'}">${item.status}</span>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap justify-between items-center gap-3 pt-1">
+                        <div class="text-xs text-slate-300 font-mono">
+                            ${item.code ? `<span class="text-slate-400">Código FDT:</span> <span class="text-sky-300">${item.code}</span>` : '<span class="text-slate-400">Sin código de módulo asignado</span>'}
+                        </div>
+
+                        <div>
+                            <button id="qr-action-btn" class="px-4 py-2 font-bold text-xs rounded-xl transition-all shadow-md flex items-center gap-2 ${
+                                isCollected 
+                                    ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/20' 
+                                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20'
+                            }">
+                                ${isCollected ? '<i class="fa-solid fa-rotate-left"></i> Desmarcar Recolectado' : '<i class="fa-solid fa-check"></i> MARCAR COMO RECOLECTADO AHORA'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('qr-view-full').onclick = () => openModal(item.id);
+            document.getElementById('qr-action-btn').onclick = () => toggleCollection(item.id);
+        }
+
+        function renderQrNotFound(query) {
+            qrResultContainer.classList.remove('hidden');
+            qrResultContainer.innerHTML = `
+                <div class="bg-slate-800/90 border border-amber-500/50 rounded-xl p-4 shadow-lg flex items-start gap-3">
+                    <div class="p-2 bg-amber-500/10 text-amber-400 rounded-lg shrink-0">
+                        <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                    </div>
+                    <div class="space-y-1">
+                        <h3 class="text-xs font-bold text-amber-300 uppercase tracking-wider">CABLE NO REQUIERE RECOLECCIÓN / NO ENCONTRADO</h3>
+                        <p class="text-xs text-slate-300">
+                            El código escaneado <code class="bg-slate-950 px-1.5 py-0.5 rounded text-amber-300 font-mono">${query}</code> no pertenece a la lista prioritaria de recolección (&ge;129 usos) o no existe en la base de datos actual.
+                        </p>
+                        <p class="text-[11px] text-slate-400">No se requiere retiro inmediato de la línea de producción.</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function clearQrInput() {
+            qrInput.value = '';
+            clearQrBtn.classList.add('hidden');
+            qrResultContainer.classList.add('hidden');
+            qrInput.focus();
+        }
+
+        function render() {
+            updateMetrics();
+
+            const filteredData = getFilteredData();
+
+            const pendingList = filteredData.filter(item => !collectedSet.has(item.id));
+            const collectedList = filteredData.filter(item => collectedSet.has(item.id));
+
+            pendingCountBadge.textContent = pendingList.length;
+            collectedCountBadge.textContent = collectedList.length;
+
+            if (pendingList.length === 0) {
+                tablePendingBody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="p-8 text-center text-slate-500">
+                            <i class="fa-solid fa-circle-check text-2xl text-slate-600 mb-2 block"></i>
+                            No hay cables pendientes con los filtros aplicados.
+                        </td>
+                    </tr>
+                `;
+            } else {
+                tablePendingBody.innerHTML = pendingList.map(item => {
+                    const isCritical = item.alert === "REPLACE IMMEDIATELY";
+                    const isEnUso = item.status === "EN USO";
+
+                    return `
+                        <tr data-id="${item.id}" class="clickable-row hover:bg-slate-700/40 transition-colors cursor-pointer group">
+                            <td class="p-3.5 text-center action-td">
+                                <button data-id="${item.id}" title="Marcar como recolectado"
+                                    class="collect-btn w-7 h-7 rounded-lg border border-slate-600 bg-slate-800 hover:bg-emerald-600 hover:border-emerald-500 text-transparent hover:text-white flex items-center justify-center transition-all">
+                                    <i class="fa-solid fa-check text-xs"></i>
+                                </button>
+                            </td>
+                            <td class="p-3.5 font-mono font-bold text-white group-hover:text-sky-400 transition-colors">
+                                ${item.id}
+                            </td>
+                            <td class="p-3.5 text-center font-mono font-bold">
+                                <span class="px-2 py-0.5 rounded-md ${isCritical ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}">
+                                    ${item.uses}
+                                </span>
+                            </td>
+                            <td class="p-3.5">
+                                ${isCritical 
+                                    ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                                         <i class="fa-solid fa-triangle-exclamation text-xs"></i> REPLACE IMMEDIATELY
+                                       </span>`
+                                    : `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                                         <i class="fa-solid fa-clock text-xs"></i> Near limit
+                                       </span>`
+                                }
+                            </td>
+                            <td class="p-3.5">
+                                ${isEnUso
+                                    ? `<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 inline-flex items-center gap-1">
+                                         <span class="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse"></span> EN USO
+                                       </span>`
+                                    : `<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 inline-flex items-center gap-1">
+                                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> LIBRE
+                                       </span>`
+                                }
+                            </td>
+                            <td class="p-3.5 font-mono text-slate-300">
+                                ${item.code ? `<span class="text-sky-300 font-semibold">${item.code}</span>` : '<span class="text-slate-500">-</span>'}
+                            </td>
+                            <td class="p-3.5 font-mono text-slate-300">${item.location}</td>
+                            <td class="p-3.5 font-mono text-slate-400 text-[11px]">${item.date}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            if (collectedList.length === 0) {
+                tableCollectedBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="p-8 text-center text-slate-500">
+                            No se han recolectado cables en este grupo.
+                        </td>
+                    </tr>
+                `;
+            } else {
+                tableCollectedBody.innerHTML = collectedList.map(item => {
+                    const isCritical = item.alert === "REPLACE IMMEDIATELY";
+
+                    return `
+                        <tr data-id="${item.id}" class="clickable-row hover:bg-slate-700/40 transition-colors cursor-pointer group opacity-85">
+                            <td class="p-3.5 text-center action-td">
+                                <button data-id="${item.id}" title="Devolver a pendientes"
+                                    class="uncollect-btn w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center hover:bg-rose-600 transition-all">
+                                    <i class="fa-solid fa-arrow-rotate-left text-xs"></i>
+                                </button>
+                            </td>
+                            <td class="p-3.5 font-mono font-bold text-emerald-300 line-through group-hover:text-sky-400 transition-colors">
+                                ${item.id}
+                            </td>
+                            <td class="p-3.5 text-center font-mono font-bold">
+                                <span class="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                    ${item.uses}
+                                </span>
+                            </td>
+                            <td class="p-3.5 text-slate-400">
+                                ${isCritical ? 'Reemplazo Inmediato' : 'Cerca de límite'}
+                            </td>
+                            <td class="p-3.5 text-slate-400 font-mono">${item.status}</td>
+                            <td class="p-3.5 font-mono text-slate-400">${item.location}</td>
+                            <td class="p-3.5 font-mono text-emerald-400 text-[11px]">
+                                <i class="fa-solid fa-check-double mr-1"></i> Recolectado
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            // Asignación de Eventos a Filas y Botones dinámicos
+            document.querySelectorAll('.clickable-row').forEach(row => {
+                row.addEventListener('click', (e) => {
+                    if (e.target.closest('.action-td')) return;
+                    openModal(row.dataset.id);
+                });
+            });
+
+            document.querySelectorAll('.collect-btn, .uncollect-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleCollection(btn.dataset.id, e);
+                });
+            });
+        }
+
+        function openModal(id) {
+            const item = rawLogData.find(c => c.id === id);
+            if (!item) return;
+
+            selectedCableId = id;
+            const isCollected = collectedSet.has(id);
+            const isCritical = item.alert === "REPLACE IMMEDIATELY";
+
+            mCableId.textContent = item.id;
+            mUses.textContent = `${item.uses} usos`;
+            
+            if (isCritical) {
+                mAlertBadge.innerHTML = `
+                    <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 inline-block">
+                        <i class="fa-solid fa-triangle-exclamation mr-1"></i> REPLACE IMMEDIATELY
+                    </span>`;
+                mActionAdvice.textContent = "CRÍTICO: Este cable alcanzó/excedió los 130 usos. Debe reemplazarse de inmediato para evitar fallas mecánicas o térmicas.";
+            } else {
+                mAlertBadge.innerHTML = `
+                    <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 inline-block">
+                        <i class="fa-solid fa-clock mr-1"></i> Warning: Near limit
+                    </span>`;
+                mActionAdvice.textContent = "ALERTA: El cable se encuentra en el límite preventivo de 129 usos. Retirar y enviar a recolección de revisión.";
+            }
+
+            mOperationalStatus.textContent = item.status;
+            mOperationalStatus.className = item.status === 'EN USO' ? 'font-bold text-purple-400' : 'font-bold text-emerald-400';
+
+            mFdtCode.textContent = item.code ? item.code : 'Sin código de módulo asignado';
+            mLocation.textContent = item.location;
+            mDate.textContent = item.date;
+
+            mCollectedStatus.textContent = isCollected ? 'Recolectado' : 'Pendiente por recolectar';
+            mCollectedStatus.className = isCollected ? 'font-bold text-emerald-400' : 'font-bold text-amber-400';
+
+            if (isCollected) {
+                mToggleCollectBtn.className = "px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-rose-600/20";
+                mToggleCollectBtn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> Cambiar a Pendiente';
+            } else {
+                mToggleCollectBtn.className = "px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-emerald-600/20";
+                mToggleCollectBtn.innerHTML = '<i class="fa-solid fa-check"></i> Marcar como Recolectado';
+            }
+
+            detailModal.classList.remove('hidden');
+            setTimeout(() => {
+                detailModal.classList.remove('opacity-0');
+                modalCard.classList.remove('scale-95');
+            }, 10);
+        }
+
+        function closeModal() {
+            detailModal.classList.add('opacity-0');
+            modalCard.classList.add('scale-95');
+            setTimeout(() => {
+                detailModal.classList.add('hidden');
+                selectedCableId = null;
+            }, 200);
+        }
+
+        // Event Listeners
+        document.getElementById('qr-scan-form').addEventListener('submit', handleQrScan);
+        clearQrBtn.addEventListener('click', clearQrInput);
+
+        qrInput.addEventListener('input', (e) => {
+            if (e.target.value.length > 0) {
+                clearQrBtn.classList.remove('hidden');
+            } else {
+                clearQrBtn.classList.add('hidden');
+            }
+        });
+
+        filterTarget129Btn.addEventListener('click', () => {
+            filterTarget129Only = true;
+            filterTarget129Btn.className = "px-3 py-1.5 rounded-lg font-medium transition-all bg-sky-600 text-white shadow-sm";
+            filterTargetAllBtn.className = "px-3 py-1.5 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition-all";
+            render();
+        });
+
+        filterTargetAllBtn.addEventListener('click', () => {
+            filterTarget129Only = false;
+            filterTargetAllBtn.className = "px-3 py-1.5 rounded-lg font-medium transition-all bg-sky-600 text-white shadow-sm";
+            filterTarget129Btn.className = "px-3 py-1.5 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition-all";
+            render();
+        });
+
+        searchInput.addEventListener('input', (e) => {
+            activeSearchQuery = e.target.value;
+            render();
+        });
+
+        statusFilter.addEventListener('change', (e) => {
+            activeStatusFilter = e.target.value;
+            render();
+        });
+
+        resetBtn.addEventListener('click', async () => {
+            if (confirm("¿Estás seguro de que deseas reiniciar todos los estados de recolección en la base de datos?")) {
+                for (const id of collectedSet) {
+                    await deleteDoc(doc(db, "cables", id));
+                }
+                qrResultContainer.classList.add('hidden');
+                lastScannedItem = null;
+            }
+        });
+
+        modalCloseBtn.addEventListener('click', closeModal);
+        detailModal.addEventListener('click', (e) => {
+            if (e.target === detailModal) closeModal();
+        });
+
+        mToggleCollectBtn.addEventListener('click', () => {
+            if (selectedCableId) {
+                toggleCollection(selectedCableId);
+            }
+        });
+
+        mCopyBtn.addEventListener('click', () => {
+            if (!selectedCableId) return;
+            const item = rawLogData.find(c => c.id === selectedCableId);
+            if (!item) return;
+
+            const textToCopy = `CABLE: ${item.id}\nUSOS: ${item.uses}\nESTADO: ${item.status}\nUBICACIÓN: ${item.location}\nCÓDIGO: ${item.code || 'N/A'}\nFECHA: ${item.date}`;
+            
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                mCopyBtn.innerHTML = '<i class="fa-solid fa-check text-emerald-400"></i> ¡Copiado!';
+                setTimeout(() => {
+                    mCopyBtn.innerHTML = '<i class="fa-solid fa-copy"></i> Copiar Datos';
+                }, 1800);
+            });
+        });
+
+        window.onload = function() {
+            qrInput.focus();
+        };
+    </script>
+</body>
+</html>
