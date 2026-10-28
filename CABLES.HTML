@@ -409,7 +409,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
-        import { getFirestore, doc, setDoc, deleteDoc, getDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, deleteDoc, getDoc, getDocs, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBdaZVSLkDzYAx56-EpN7YTO3hOV_PnbJc",
@@ -429,74 +429,70 @@
         const REQUIRED_PASSWORD = "CABLESLOOP";
         let currentUser = localStorage.getItem('cable_app_user') || null;
 
-        const preCollectedIDs = [
-            "MT2524XC28881", "MT2524XC29113", "MT2524XC27359", "MT2524XC28234",
-            "MT2524XC28551", "MT2524XC27394", "MT2524XC28470", "MT2524XC28526",
-            "MT2524XC28591", "MT2524XC28527", "MT2524XC27469", "MT2524XC28518",
-            "MT2524XC28882"
-        ];
+        const preCollectedIDs = [];
 
         const rawLogData = [
-            { id: "MT2524XC20065", uses: 142, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-02-09", date: "2026-09-17 10:08:02", code: null },
             { id: "MT2524XC28725", uses: 142, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-15-04", date: "2026-09-11 23:17:46", code: null },
-            { id: "MT2524XC28881", uses: 137, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-12-08", date: "2026-09-15 23:23:58", code: null },
-            { id: "MT2524XC29113", uses: 136, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-12-07", date: "2026-09-10 04:21:39", code: null },
-            { id: "MT2524XC27359", uses: 134, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-11-02", date: "2026-09-17 09:01:30", code: null },
-            { id: "MT2524XC28234", uses: 134, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-03-06", date: "2026-09-09 18:05:23", code: null },
-            { id: "MT2524XC28551", uses: 133, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-15-12", date: "2026-09-17 12:59:22", code: null },
-            { id: "MT2524XC27394", uses: 132, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-14-01", date: "2026-09-09 07:38:15", code: null },
-            { id: "MT2524XC28470", uses: 132, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-07-11", date: "2026-09-17 09:05:44", code: null },
-            { id: "MT2524XC28526", uses: 132, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-07-11", date: "2026-09-17 09:05:44", code: null },
-            { id: "MT2524XC28591", uses: 132, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-09-10", date: "2026-09-17 08:00:32", code: null },
             { id: "MT2524XC28471", uses: 131, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-18-03", date: "2026-09-12 13:01:37", code: null },
-            { id: "MT2524XC28527", uses: 131, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-12-06", date: "2026-09-09 21:01:08", code: null },
-            { id: "MT2524XC27469", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-03-06", date: "2026-09-13 00:30:52", code: null },
-            { id: "MT2524XC28518", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-08-12", date: "2026-09-09 22:58:31", code: null },
-            { id: "MT2524XC28882", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-04-02", date: "2026-09-17 13:10:35", code: null },
-            { id: "MT2524XC21738", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-03-03", date: "2026-09-22 08:40:17", code: null },
-            { id: "MT2524XC21747", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-16-05", date: "2026-09-24 21:48:44", code: null },
-            { id: "MT2524XC21761", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-16-05", date: "2026-09-24 20:38:48", code: null },
-            { id: "MT2524XC27195", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-07-05", date: "2026-09-23 23:45:28", code: null },
-            { id: "MT2524XC27235", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-10-08", date: "2026-09-24 09:16:40", code: null },
-            { id: "MT2524XC27279", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-14-05", date: "2026-09-26 08:35:06", code: null },
-            { id: "MT2524XC27419", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-02-08", date: "2026-09-19 09:15:37", code: null },
-            { id: "MT2524XC27443", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-15-08", date: "2026-09-19 21:50:13", code: null },
-            { id: "MT2524XC27451", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-17-01", date: "2026-09-23 21:08:38", code: null },
-            { id: "MT2524XC27465", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-14-09", date: "2026-09-24 15:37:31", code: null },
-            { id: "MT2524XC27507", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-15-12", date: "2026-09-25 15:42:01", code: null },
-            { id: "MT2524XC27640", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-04-07", date: "2026-09-23 08:37:57", code: null },
-            { id: "MT2524XC27892", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-11-03", date: "2026-09-23 09:20:48", code: null },
-            { id: "MT2524XC28425", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-12-09", date: "2026-09-20 00:41:52", code: null },
-            { id: "MT2524XC28498", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-08-09", date: "2026-09-21 20:26:40", code: null },
-            { id: "MT2524XC28565", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-12-08", date: "2026-09-25 21:39:55", code: null },
-            { id: "MT2524XC28606", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-13-09", date: "2026-09-23 17:09:17", code: null },
-            { id: "MT2524XC28641", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-08-04", date: "2026-09-25 13:25:28", code: null },
-            { id: "MT2524XC28678", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-10-08", date: "2026-09-26 17:33:39", code: null },
-            { id: "MT2524XC28701", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-07-05", date: "2026-09-23 23:45:28", code: null },
-            { id: "MT2524XC28804", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-13-06", date: "2026-09-20 04:24:56", code: null },
-            { id: "MT2524XC28847", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-07-04", date: "2026-09-19 23:34:19", code: null },
-            { id: "MT2524XC28863", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-03-08", date: "2026-09-23 16:59:52", code: null },
-            { id: "MT2524XC28869", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-14-05", date: "2026-09-26 12:25:12", code: null },
-            { id: "MT2524XC28894", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-11-07", date: "2026-09-26 08:22:16", code: null },
-            { id: "MT2524XC28951", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-08-05", date: "2026-09-23 17:18:52", code: null },
-            { id: "MT2524XC29014", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-07-10", date: "2026-09-19 23:37:13", code: null },
-            { id: "MT2524XC29038", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-18-13", date: "2026-09-26 08:37:27", code: null },
-            { id: "MT2524XC29042", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-10-12", date: "2026-09-22 17:32:35", code: null },
-            { id: "MT2524XC29086", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-11-09", date: "2026-09-26 08:30:55", code: null },
-            { id: "MT2524XC29104", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-08-04", date: "2026-09-26 16:31:16", code: null },
-            { id: "MT2524XC29105", uses: 130, alert: "Warning: Near limit", status: "EN USO", location: "M6L10B-06-12 · FDT", date: "2026-09-27 03:21:52", code: "1CLE63800496" },
-            { id: "MT2524XC29118", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-13-06", date: "2026-09-24 09:23:19", code: null },
-            { id: "MT2524XC29124", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-08-09", date: "2026-09-25 21:02:20", code: null },
-            { id: "MT2524XC20054", uses: 129, alert: "Warning: Near limit", status: "LIBRE", location: "M7L10A-12-07", date: "2026-09-25 21:39:05", code: null },
-            { id: "MT2524XC21759", uses: 129, alert: "Warning: Near limit", status: "LIBRE", location: "M6L10A-15-05", date: "2026-09-17 20:26:38", code: null },
-            { id: "MT2524XC27412", uses: 129, alert: "Warning: Near limit", status: "LIBRE", location: "M6L10A-08-03", date: "2026-09-26 21:06:28", code: null },
-            { id: "MT2524XC27833", uses: 129, alert: "Warning: Near limit", status: "EN USO", location: "M6L10B-07-08 · FDT", date: "2026-09-27 00:58:36", code: "1CLE63800488" },
+            { id: "MT2524XC29050", uses: 131, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-15-04", date: "2026-10-25 09:31:49", code: null },
+            { id: "MT2524XC20026", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-05-07", date: "2026-10-24 08:37:23", code: null },
+            { id: "MT2524XC21781", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-10-08", date: "2026-10-25 08:45:25", code: null },
+            { id: "MT2524XC21789", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-11-08", date: "2026-10-17 20:47:42", code: null },
+            { id: "MT2524XC21791", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-15-03", date: "2026-10-27 21:58:29", code: null },
+            { id: "MT2524XC27175", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-13-13", date: "2026-10-05 09:41:15", code: null },
+            { id: "MT2524XC27200", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-06-06", date: "2026-10-23 04:04:05", code: null },
+            { id: "MT2524XC27237", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-15-07", date: "2026-10-12 14:37:00", code: null },
+            { id: "MT2524XC27293", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-15-03", date: "2026-10-23 08:23:35", code: null },
+            { id: "MT2524XC27307", uses: 130, alert: "REPLACE IMMEDIATELY", status: "EN USO", location: "M7L10A-06-11 · FDT", date: "2026-10-27 13:20:30", code: "1CLE64201567" },
+            { id: "MT2524XC27337", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-16-08", date: "2026-10-02 18:23:22", code: null },
+            { id: "MT2524XC27354", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-11-10", date: "2026-10-23 11:54:14", code: null },
+            { id: "MT2524XC27360", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-14-05", date: "2026-10-12 23:50:34", code: null },
+            { id: "MT2524XC27404", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-12-04", date: "2026-10-13 19:05:23", code: null },
+            { id: "MT2524XC27406", uses: 130, alert: "REPLACE IMMEDIATELY", status: "EN USO", location: "M6L10B-11-09 · FDT", date: "2026-10-27 16:46:10", code: "1CLE64002214" },
+            { id: "MT2524XC27413", uses: 130, alert: "REPLACE IMMEDIATELY", status: "EN USO", location: "M6L10A-05-03 · FDT", date: "2026-10-28 07:58:21", code: "1CLE64201296" },
+            { id: "MT2524XC27422", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-02-06", date: "2026-10-03 08:51:48", code: null },
+            { id: "MT2524XC27488", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-16-06", date: "2026-10-12 20:43:50", code: null },
+            { id: "MT2524XC27617", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-17-07", date: "2026-10-24 14:06:40", code: null },
+            { id: "MT2524XC27678", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-13-02", date: "2026-10-12 17:45:22", code: null },
+            { id: "MT2524XC27765", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-10-08", date: "2026-10-27 10:14:05", code: null },
+            { id: "MT2524XC28010", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-01-03", date: "2026-10-02 16:26:29", code: null },
+            { id: "MT2524XC28114", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-05-06", date: "2026-10-13 12:59:26", code: null },
+            { id: "MT2524XC28422", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-11-03", date: "2026-10-24 19:07:58", code: null },
+            { id: "MT2524XC28454", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-13-03", date: "2026-09-30 18:32:53", code: null },
+            { id: "MT2524XC28603", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-13-09", date: "2026-10-24 10:38:28", code: null },
+            { id: "MT2524XC28604", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-11-09", date: "2026-10-24 10:28:41", code: null },
+            { id: "MT2524XC28627", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-14-06", date: "2026-10-13 04:40:37", code: null },
+            { id: "MT2524XC28633", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-12-02", date: "2026-10-03 14:25:40", code: null },
+            { id: "MT2524XC28690", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10B-06-05", date: "2026-10-03 09:50:27", code: null },
+            { id: "MT2524XC28702", uses: 130, alert: "REPLACE IMMEDIATELY", status: "EN USO", location: "M6L10A-05-03 · FDT", date: "2026-10-28 07:58:21", code: "1CLE64201296" },
+            { id: "MT2524XC28723", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-02-08", date: "2026-10-24 05:44:40", code: null },
+            { id: "MT2524XC28731", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10B-04-09", date: "2026-10-25 00:18:51", code: null },
+            { id: "MT2524XC28739", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-10-09", date: "2026-10-26 11:19:05", code: null },
+            { id: "MT2524XC28806", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-04-05", date: "2026-10-10 21:40:10", code: null },
+            { id: "MT2524XC28875", uses: 130, alert: "REPLACE IMMEDIATELY", status: "EN USO", location: "M6L10B-13-07 · FDT", date: "2026-10-27 16:37:56", code: "1CLE64201339" },
+            { id: "MT2524XC28905", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-14-09", date: "2026-10-12 14:24:35", code: null },
+            { id: "MT2524XC28923", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-18-09", date: "2026-10-23 17:32:44", code: null },
+            { id: "MT2524XC28927", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-02-07", date: "2026-10-03 16:13:56", code: null },
+            { id: "MT2524XC28949", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-16-08", date: "2026-10-13 11:18:57", code: null },
+            { id: "MT2524XC28959", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10B-09-05", date: "2026-10-07 12:00:31", code: null },
+            { id: "MT2524XC28993", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10B-01-01", date: "2026-10-25 01:04:16", code: null },
+            { id: "MT2524XC29012", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-06-06", date: "2026-10-24 13:36:21", code: null },
+            { id: "MT2524XC29021", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-08-07", date: "2026-10-12 21:16:25", code: null },
+            { id: "MT2524XC29035", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10B-06-07", date: "2026-10-02 08:20:13", code: null },
+            { id: "MT2524XC29047", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-09-10", date: "2026-10-26 17:35:30", code: null },
+            { id: "MT2524XC29049", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10B-14-10", date: "2026-10-13 16:55:13", code: null },
+            { id: "MT2524XC29073", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10B-08-07", date: "2026-10-02 13:26:14", code: null },
+            { id: "MT2524XC29157", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M7L10A-14-11", date: "2026-10-27 10:26:01", code: null },
+            { id: "MT2524XC29198", uses: 130, alert: "REPLACE IMMEDIATELY", status: "LIBRE", location: "M6L10A-18-03", date: "2026-10-24 04:39:40", code: null },
+            { id: "MT2524XC20092", uses: 129, alert: "Warning: Near limit", status: "LIBRE", location: "M7L10A-14-07", date: "2026-10-27 02:05:25", code: null },
+            { id: "MT2524XC27234", uses: 129, alert: "Warning: Near limit", status: "EN USO", location: "M6L10A-18-09 · FDT", date: "2026-10-28 07:09:55", code: "1CLE64201653" },
+            { id: "MT2524XC27842", uses: 129, alert: "Warning: Near limit", status: "EN USO", location: "M7L10A-13-03 · FDT", date: "2026-10-28 09:21:34", code: "1CLE64201638" },
             { id: "MT2524XC28117", uses: 129, alert: "Warning: Near limit", status: "LIBRE", location: "M6L10A-16-09", date: "2026-09-11 19:54:19", code: null },
-            { id: "MT2524XC28309", uses: 129, alert: "Warning: Near limit", status: "EN USO", location: "M6L10A-16-05 · FDT", date: "2026-09-27 01:02:30", code: "1CLE63900094" },
-            { id: "MT2524XC28721", uses: 129, alert: "Warning: Near limit", status: "EN USO", location: "M6L10A-09-02 · FDT", date: "2026-09-28 08:49:54", code: "1CLE63800472" },
-            { id: "MT2524XC29092", uses: 129, alert: "Warning: Near limit", status: "EN USO", location: "M6L10B-04-13 · FDT", date: "2026-09-26 08:47:18", code: "1CLE63800312" },
-            { id: "MT2524XC29120", uses: 129, alert: "Warning: Near limit", status: "EN USO", location: "M6L10B-04-03 · FDT", date: "2026-09-26 12:39:47", code: "1CLE63800141" },
-            { id: "MT2545XC21296", uses: 129, alert: "Warning: Near limit", status: "LIBRE", location: "M6L10B-11-09", date: "2026-09-26 03:10:35", code: null }
+            { id: "MT2524XC28563", uses: 129, alert: "Warning: Near limit", status: "LIBRE", location: "M7L10A-07-02", date: "2026-10-25 00:12:14", code: null },
+            { id: "MT2524XC28642", uses: 129, alert: "Warning: Near limit", status: "EN USO", location: "M6L10B-09-04 · FRO", date: "2026-10-28 08:48:39", code: "1CLE64002491" },
+            { id: "MT2524XC28760", uses: 129, alert: "Warning: Near limit", status: "EN USO", location: "M6L10B-14-11 · FDT", date: "2026-10-27 18:20:10", code: "1CLE64201691" },
+            { id: "MT2524XC28932", uses: 129, alert: "Warning: Near limit", status: "LIBRE", location: "M6L10A-08-04", date: "2026-10-27 14:31:54", code: null },
+            { id: "MT2524XC28972", uses: 129, alert: "Warning: Near limit", status: "LIBRE", location: "M6L10B-14-13", date: "2026-10-27 18:19:21", code: null }
         ];
 
         let collectedMap = new Map(); // Guarda ID -> { byUser, timestamp }
@@ -581,22 +577,23 @@
             qrInput.focus();
         });
 
-        // Carga Inicial de Datos por defecto
-        async function ensurePreCollectedData() {
-            for (const id of preCollectedIDs) {
-                const docRef = doc(db, "cables", id);
-                const docSnap = await getDoc(docRef);
-                if (!docSnap.exists()) {
-                    await setDoc(docRef, {
-                        collected: true,
-                        byUser: "Sistema",
-                        timestamp: new Date().toISOString()
-                    });
+        // Reinicio único: borra lo guardado en la nube y deja todos los cables como pendientes
+        const RESET_VERSION = "2026-10-28";
+        async function resetCloudOnce() {
+            try {
+                const markerRef = doc(db, "cables", "_reset_marker");
+                const marker = await getDoc(markerRef);
+                if (marker.exists() && marker.data().version === RESET_VERSION) return;
+                const all = await getDocs(collection(db, "cables"));
+                for (const d of all.docs) {
+                    if (d.id !== "_reset_marker") await deleteDoc(d.ref);
                 }
+                await setDoc(markerRef, { version: RESET_VERSION, collected: false, timestamp: new Date().toISOString() });
+            } catch (err) {
+                console.error("Error al reiniciar:", err);
             }
         }
-
-        ensurePreCollectedData();
+        resetCloudOnce();
 
         // Notificación Flotante Estilo Competencia
         function showNotification(user, cableId, uses) {
