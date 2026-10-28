@@ -7,6 +7,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -318,6 +320,46 @@
                             </tr>
                         </thead>
                         <tbody id="table-collected-body" class="divide-y divide-slate-700/40 text-slate-300 font-medium">
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- TABLA 3: ALMACÉN (ESCANEADOS) -->
+            <section class="bg-slate-800/60 border border-sky-500/40 rounded-2xl overflow-hidden shadow-sm">
+                <div class="px-5 py-4 border-b border-slate-700/60 flex flex-wrap justify-between items-center gap-3 bg-slate-800/90">
+                    <div class="flex items-center gap-2.5">
+                        <span class="inline-flex rounded-full h-3 w-3 bg-sky-500"></span>
+                        <h2 class="text-base font-bold text-white flex items-center gap-2">
+                            Almacén · Cables Escaneados
+                            <span id="almacen-count-badge" class="bg-sky-500/20 text-sky-300 text-xs font-mono px-2.5 py-0.5 rounded-full border border-sky-500/30">0</span>
+                        </h2>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="text-xs text-slate-400">Todo lo que escaneas se guarda aquí automáticamente.</span>
+                        <button id="almacen-pdf-btn" type="button" class="px-3.5 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-all">
+                            <i class="fa-solid fa-file-pdf"></i> Descargar PDF
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-slate-900/60 text-slate-400 font-semibold border-b border-slate-700/60 uppercase tracking-wider">
+                                <th class="p-3.5 text-center w-12">Quitar</th>
+                                <th class="p-3.5 text-center">#</th>
+                                <th class="p-3.5">ID / Código Escaneado</th>
+                                <th class="p-3.5 text-center">Usos</th>
+                                <th class="p-3.5">Nivel Alerta</th>
+                                <th class="p-3.5">Estatus Previo</th>
+                                <th class="p-3.5">Ubicación Registrada</th>
+                                <th class="p-3.5">Escaneado Por</th>
+                                <th class="p-3.5">Último Escaneo</th>
+                                <th class="p-3.5 text-center">Veces</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-almacen-body" class="divide-y divide-slate-700/40 text-slate-300 font-medium">
                         </tbody>
                     </table>
                 </div>
@@ -685,6 +727,119 @@
             }
         }
 
+        // ===== ALMACÉN: todo lo escaneado se guarda aparte =====
+        let almacenMap = new Map(); // key -> datos del escaneo
+        const tableAlmacenBody = document.getElementById('table-almacen-body');
+        const almacenCountBadge = document.getElementById('almacen-count-badge');
+
+        function escHtml(t) {
+            return String(t ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+        }
+        function almacenKey(text) {
+            return String(text).replace(/[\/\s#?\[\]]/g, '_').slice(0, 150);
+        }
+        function fmtDate(iso) {
+            try { return new Date(iso).toLocaleString('es-MX'); } catch (e) { return iso || ''; }
+        }
+
+        async function addToAlmacen(item, rawQuery) {
+            const key = almacenKey(item ? item.id : rawQuery);
+            const prev = almacenMap.get(key);
+            const entry = {
+                code: item ? item.id : rawQuery,
+                matched: !!item,
+                uses: item ? item.uses : null,
+                alert: item ? item.alert : 'No está en la lista',
+                status: item ? item.status : '-',
+                location: item ? item.location : '-',
+                byUser: currentUser || 'Técnico',
+                timestamp: new Date().toISOString(),
+                firstTimestamp: prev ? prev.firstTimestamp : new Date().toISOString(),
+                scans: (prev ? prev.scans : 0) + 1
+            };
+            almacenMap.set(key, entry);
+            renderAlmacen();
+            try {
+                await setDoc(doc(db, "almacen", key), entry);
+            } catch (err) {
+                console.error("Error guardando en almacén:", err);
+            }
+        }
+
+        function almacenSorted() {
+            return Array.from(almacenMap.values()).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        }
+
+        function renderAlmacen() {
+            const list = almacenSorted();
+            almacenCountBadge.textContent = list.length;
+            if (list.length === 0) {
+                tableAlmacenBody.innerHTML = `<tr><td colspan="10" class="p-8 text-center text-slate-500">
+                    <i class="fa-solid fa-box-open text-2xl text-slate-600 mb-2 block"></i>
+                    Aún no hay cables escaneados. Escanea uno y se agregará aquí.</td></tr>`;
+                return;
+            }
+            tableAlmacenBody.innerHTML = list.map((e, i) => `
+                <tr class="hover:bg-slate-700/30">
+                    <td class="p-3.5 text-center">
+                        <button data-almacen-key="${escHtml(almacenKey(e.code))}" title="Quitar del almacén" class="almacen-del text-rose-400 hover:text-rose-300"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                    <td class="p-3.5 text-center font-mono text-slate-400">${list.length - i}</td>
+                    <td class="p-3.5 font-mono font-bold ${e.matched ? 'text-sky-300' : 'text-amber-300'}">${escHtml(e.code)}</td>
+                    <td class="p-3.5 text-center font-mono">${e.uses ?? '-'}</td>
+                    <td class="p-3.5">${escHtml(e.alert)}</td>
+                    <td class="p-3.5">${escHtml(e.status)}</td>
+                    <td class="p-3.5 font-mono">${escHtml(e.location)}</td>
+                    <td class="p-3.5">${escHtml(e.byUser)}</td>
+                    <td class="p-3.5 font-mono">${escHtml(fmtDate(e.timestamp))}</td>
+                    <td class="p-3.5 text-center font-mono">${e.scans}</td>
+                </tr>`).join('');
+            tableAlmacenBody.querySelectorAll('.almacen-del').forEach(btn => {
+                btn.onclick = async () => {
+                    const k = btn.getAttribute('data-almacen-key');
+                    almacenMap.delete(k);
+                    renderAlmacen();
+                    try { await deleteDoc(doc(db, "almacen", k)); } catch (err) { console.error(err); }
+                };
+            });
+        }
+
+        onSnapshot(collection(db, "almacen"), (snapshot) => {
+            snapshot.docChanges().forEach((change) => {
+                if (change.type === "removed") almacenMap.delete(change.doc.id);
+                else almacenMap.set(change.doc.id, change.doc.data());
+            });
+            renderAlmacen();
+        }, (error) => console.error("Error al sincronizar almacén:", error));
+
+        function downloadAlmacenPdf() {
+            const list = almacenSorted();
+            if (list.length === 0) { alert('El almacén está vacío.'); return; }
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'letter' });
+            const now = new Date();
+            const libres = list.filter(e => e.matched && e.status === 'LIBRE').length;
+            const enUso = list.filter(e => e.matched && e.status === 'EN USO').length;
+            const noLista = list.filter(e => !e.matched).length;
+
+            pdf.setFontSize(16);
+            pdf.text('Reporte de Almacén - Cables Escaneados', 40, 40);
+            pdf.setFontSize(10);
+            pdf.text('Generado: ' + now.toLocaleString('es-MX') + '   |   Por: ' + (currentUser || 'Técnico'), 40, 58);
+            pdf.text('Total en almacén: ' + list.length + '   |   Libres: ' + libres + '   |   En uso: ' + enUso + '   |   No en lista: ' + noLista, 40, 72);
+
+            pdf.autoTable({
+                startY: 86,
+                head: [['#', 'ID / Código', 'Usos', 'Nivel Alerta', 'Estatus Previo', 'Ubicación', 'Escaneado Por', 'Último Escaneo', 'Veces']],
+                body: list.map((e, i) => [list.length - i, e.code, e.uses ?? '-', e.alert, e.status, e.location, e.byUser, fmtDate(e.timestamp), e.scans]),
+                styles: { fontSize: 8, cellPadding: 3 },
+                headStyles: { fillColor: [2, 132, 199] },
+                margin: { left: 40, right: 40 }
+            });
+            pdf.save('Almacen_Cables_' + now.toISOString().slice(0, 10) + '.pdf');
+        }
+        document.getElementById('almacen-pdf-btn').addEventListener('click', downloadAlmacenPdf);
+
         function getFilteredData() {
             return rawLogData.filter(item => {
                 if (filterTarget129Only && item.uses < 129) return false;
@@ -756,9 +911,11 @@
             if (matchedItem) {
                 lastScannedItem = matchedItem;
                 renderQrResult(matchedItem);
+                addToAlmacen(matchedItem, query);
             } else {
                 lastScannedItem = null;
                 renderQrNotFound(query);
+                addToAlmacen(null, query);
             }
 
             if (autoClearCheck.checked) {
